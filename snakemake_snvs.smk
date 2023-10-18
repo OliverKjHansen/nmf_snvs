@@ -53,10 +53,10 @@ rule all:
 	input:
 		expand(["files/{datasets}/coverage_files/{chrom}.BRAVO_TOPMed_coverage_hg38.txt.gz",
 		"files/{datasets}/derived_files/accepted_coverage/{chrom}x10_{fraction}p.bed", # This file contains a bedfile of all the regions that passes the restriction i have put on 80% of the individuals needs to have a coverage of 10x
-		#"files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed",
+		"files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed",
 		"files/{datasets}/vcf_files/{chrom}.BRAVO_TOPMed_Freeze_8.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
-		#"files/{datasets}/derived_files/vcf_indels/all_indels_{freq}.vcf.gz"
+		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz"
 		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
 
 rule coverage_regions:
@@ -69,7 +69,7 @@ rule coverage_regions:
 	shell:"""
 	temp_unzipped=$(mktemp -u)
     gunzip -c {input.seq_zipped} > $temp_unzipped
-	python scripts/countingregions.py {unzipped} {params.procent} > {output.bedfile}
+	python scripts/countingregions.py $temp_unzipped {params.procent} > {output.bedfile}
 	gzip $temp_unzipped
 	"""
 rule vcf_snvs:
@@ -83,14 +83,14 @@ rule vcf_snvs:
 	bcftools filter -O z -o {output.filtered} -i 'AF<{wildcards.freq} && VRT=1' {input.raw_vcf}
 	"""
 
-# rule aggregate_chromosomes:
-# 	input:
-# 		individual_coverage = expand("files/{datasets}/accepted_coverage/{chrom}x10_{fraction}p.bed", datasets=datasets, chrom=chrom, fraction=NumberWithDepth),
-# 		individual_vcf =  expand("files/{datasets}/vcf_indels/{chrom}_indel_{freq}.vcf.gz", datasets=datasets, chrom=chrom, freq = allelefrequency)
-# 	output:
-# 		summary_coverage = expand("files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed", datasets=datasets, fraction=NumberWithDepth),
-# 		summary_vcf= expand("files/{datasets}/derived_files/vcf_indels/all_indels_{freq}.vcf.gz", datasets=datasets, freq = allelefrequency)
-# 	shell:"""
-# 	cat {output.individual_coverage} > {output.summary_coverage}
-# 	cat {output.individual_vcf} > {output.summary_vcf}
-# 	"""
+rule aggregate_chromosomes:
+	input:
+		individual_coverage = expand("files/{datasets}/derived_files/accepted_coverage/{chrom}x10_{fraction}p.bed", datasets=datasets, chrom=chrom, fraction=NumberWithDepth),
+		individual_vcf =  expand("files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz", datasets=datasets, chrom=chrom, freq = allelefrequency)
+	output:
+		summary_coverage = expand("files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed", datasets=datasets, fraction=NumberWithDepth),
+		summary_vcf= expand("files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz", datasets=datasets, freq = allelefrequency)
+	shell:"""
+	cat {input.individual_coverage} >> {output.summary_coverage}
+	cat {input.individual_vcf} >> {output.summary_vcf}
+	"""
