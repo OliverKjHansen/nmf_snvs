@@ -52,7 +52,7 @@ rule all:
 		"files/{datasets}/vcf_files/{chrom}.BRAVO_TOPMed_Freeze_8.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
-		"{window_sizes}kb_windows/clean/{region}.bed"
+		"{window_sizes}kb_windows/regions/{region}.bed"
 		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, region = region) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
 
 rule coverage_regions:
@@ -102,7 +102,7 @@ rule mega_bases:
 		time=1,
 		mem_mb=100
 	output:
-		bedfiles = "{window_sizes}kb_windows/clean/{region}.bed"
+		bedfiles = "{window_sizes}kb_windows/regions/{region}.bed"
 	shell:"""
 	printf '%s\t%s\t%s\n' {params.chrom} {params.start} {params.end} > {output.bedfiles}
 	"""
