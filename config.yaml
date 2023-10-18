@@ -34,12 +34,12 @@ chromosome_length: {chr1: 248956422, chr2: 242193529,
                     chr21: 46709983, chr22: 50818468,
                     chrX: 156040895, chrY: 57227415}
 
-window_size_kb: [10000]
+window_size_kb: [10]
 
 #kmer_indels: [4,6] #,6, 8, 10, 2]
 
 NumberWithDepth: [90]
 
-size_partition: [11,23,40] # make it in such a way there is a upper and lower limit to t
+# size_partition: [11,23,40] # make it in such a way there is a upper and lower limit to t
 
-complex_structure: [APR, DR, GQ, IR, MR, STR, Z]
+# complex_structure: [APR, DR, GQ, IR, MR, STR, Z]

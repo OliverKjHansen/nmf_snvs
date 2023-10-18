@@ -3,20 +3,15 @@
 configfile: 'config.yaml'
 
 ###IMPORTENT###
-#file_path = config["file_path"]
 # all the 
 chrom = config["chromosomes"]
 length = config["chromosome_length"]
 datasets = config["datasets"]
-
 #genome_bed = config["genome_bed"]
 #blacklist = config["blacklist"]
-#topmed = config["topmed_data"] # when i want to start filtering 
-#coverage_files = config["coverage"] # use this to make bedfiles, maybe later
-window_sizes = config["window_size_kb"]
-# kmer_indels = config["kmer_indels"]
-NumberWithDepth = config["NumberWithDepth"]
 # two_bit = config["twobitgenome"]
+window_sizes = config["window_size_kb"]
+NumberWithDepth = config["NumberWithDepth"]
 allelefrequency = config["allelefrequency"]
 # methylation_data = config["methylation_data"]
 # replication_time = config["replication_time"]
@@ -28,10 +23,10 @@ allelefrequency = config["allelefrequency"]
 def making_windows(chromosomes, length, window_sizes):
 	regions = []
 	for window_size in window_sizes:
-		size = window_size*1000000 # for an indel analysis only windows with the size of 10^6 is doable
+		size = window_size*1000 # in snv it should already be at 10.000
 		for chrom in chromosomes:
 			for pos in range(size, int(length[chrom]), size):
-				title = chrom+"_"+str(int((pos-size)/1000000))+"mb_to_"+str(int(pos/1000000))+"mb"
+				title = chrom+"_"+str(int((pos-size)/1000))+"kb_to_"+str(int(pos/1000))+"kb"
 				regions.append(title)
 	return regions
 
@@ -56,8 +51,9 @@ rule all:
 		"files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed",
 		"files/{datasets}/vcf_files/{chrom}.BRAVO_TOPMed_Freeze_8.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
-		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz"
-		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
+		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
+		"{window_sizes}kb_windows/clean/{region}.bed"
+		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, region = region) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
 
 rule coverage_regions:
 	input:
@@ -82,7 +78,6 @@ rule vcf_snvs:
 	tabix -f -p vcf {input.raw_vcf}
 	bcftools filter -O z -o {output.filtered} -i 'AF<{wildcards.freq} && VRT=1' {input.raw_vcf}
 	"""
-
 rule aggregate_chromosomes:
 	input:
 		individual_coverage = expand("files/{datasets}/derived_files/accepted_coverage/{chrom}x10_{fraction}p.bed", datasets=datasets, chrom=chrom, fraction=NumberWithDepth),
@@ -93,4 +88,21 @@ rule aggregate_chromosomes:
 	shell:"""
 	cat {input.individual_coverage} >> {output.summary_coverage}
 	cat {input.individual_vcf} >> {output.summary_vcf}
+	"""
+
+# a rule which makes the MegaBases bedfile 
+# Creating regions which are to be investigated
+rule mega_bases:
+	params: 
+		chrom = lambda wildcards: wildcards.region.split("_")[0].split("m")[0],
+		start = lambda wildcards: str(int(wildcards.region.split("_")[1].split("m")[0])*1000),
+		end = lambda wildcards: str(int(wildcards.region.split("_")[3].split("m")[0])*1000)
+	resources:
+		threads=1,
+		time=1,
+		mem_mb=100
+	output:
+		bedfiles = "{window_sizes}kb_windows/clean/{region}.bed"
+	shell:"""
+	printf '%s\t%s\t%s\n' {params.chrom} {params.start} {params.end} > {output.bedfiles}
 	"""
