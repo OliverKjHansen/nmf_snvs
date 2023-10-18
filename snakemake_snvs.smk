@@ -1,5 +1,6 @@
-# snakemake --profile slurm
-#sort -k1,1 -k2,2n
+import pickle
+import os
+
 configfile: 'config.yaml'
 
 ###IMPORTENT###
@@ -32,6 +33,19 @@ def making_windows(chromosomes, length, window_sizes):
 
 regions = making_windows(chrom, length, window_sizes)
 
+
+# Define the filename for your list data
+
+# Check if the file exists
+if os.path.exists("regions.pkl"):
+    # Load the list from the file
+    with open("regions.pkl", "rb") as file:
+        regions = pickle.load(file)
+else:
+	regions = making_windows(chrom, length, window_sizes)
+	with open("regions.pkl", "wb") as file:
+		pickle.dump(regions, file)
+
 def creating_breakpoints(kmer):
 	before = int(kmer)/2
 	after = before-1
@@ -53,7 +67,7 @@ rule all:
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
 		"{window_sizes}kb_windows/regions/{region}.bed"
-		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, region = region) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
+		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, region = regions, window_sizes = window_sizes) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
 
 rule coverage_regions:
 	input:
@@ -94,13 +108,13 @@ rule aggregate_chromosomes:
 # Creating regions which are to be investigated
 rule mega_bases:
 	params: 
-		chrom = lambda wildcards: wildcards.region.split("_")[0].split("m")[0],
-		start = lambda wildcards: str(int(wildcards.region.split("_")[1].split("m")[0])*1000),
-		end = lambda wildcards: str(int(wildcards.region.split("_")[3].split("m")[0])*1000)
+		chrom = lambda wildcards: wildcards.region.split("_")[0].split("k")[0],
+		start = lambda wildcards: str(int(wildcards.region.split("_")[1].split("k")[0])*1000),
+		end = lambda wildcards: str(int(wildcards.region.split("_")[3].split("k")[0])*1000)
 	resources:
 		threads=1,
-		time=1,
-		mem_mb=100
+		time=10,
+		mem_mb=1000
 	output:
 		bedfiles = "{window_sizes}kb_windows/regions/{region}.bed"
 	shell:"""
