@@ -65,8 +65,9 @@ rule all:
 		"files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed",
 		"files/{datasets}/vcf_files/{chrom}.BRAVO_TOPMed_Freeze_8.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
-		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
-		"{window_sizes}kb_windows/regions/{region}.bed"
+		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz"
+		"{window_sizes}kb_windows/regions/{region}.bed",
+		"{window_sizes}kb_windows/filtered_regions/{region}_{fraction}p.bed"
 		], datasets = datasets, chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, region = regions, window_sizes = window_sizes) #region = regions, window_sizes = window_sizes, kmer = kmer_indels,chrom = chrom, fraction = NumberWithDepth, freq = allelefrequency, size_partition = size_partition, complex_structure = complex_structure)
 
 rule coverage_regions:
@@ -106,6 +107,17 @@ rule aggregate_chromosomes:
 
 # a rule which makes the MegaBases bedfile 
 # Creating regions which are to be investigated
+
+#might be faster in a for loop
+# for region in regions:
+# 	chromos = region.split("_")[0].split("k")[0]
+# 	start = str(int(region.split("_")[1].split("k")[0])*1000)
+# 	end = str(int(region.split("_")[3].split("k")[0])*1000)
+
+# 	filename = f"10kb_windows/regions/{region}.bed"
+# 	with open(filename, "w") as file:
+# 		file.write(f"{chromos}\\{start}\\{end}\n")
+
 rule mega_bases:
 	params: 
 		chrom = lambda wildcards: wildcards.region.split("_")[0].split("k")[0],
@@ -119,4 +131,34 @@ rule mega_bases:
 		bedfiles = "{window_sizes}kb_windows/regions/{region}.bed"
 	shell:"""
 	printf '%s\t%s\t%s\n' {params.chrom} {params.start} {params.end} > {output.bedfiles}
+	"""
+
+rule filtering_regions:
+	input:
+		regions = "{window_sizes}kb_windows/regions/{region}.bed",
+		coverage_accepted = expand("files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed", datasets=datasets, fraction=NumberWithDepth),
+		blacklist = blacklist,
+		exons = exons
+	conda: "envs/bedtools.yaml"
+	resources:
+		threads=1,
+		time=60,
+		mem_mb=1000
+	output:
+		tmp_cov = temporary("{window_sizes}kb_windows/tmp/tmp_coverage_{region}_{fraction}p.bed"),
+		tmp_blacklist = temporary("{window_sizes}kb_windows/tmp/blacklist_{region}_{fraction}p.bed"),
+		tmp_exons = temporary("{window_sizes}kb_windows/tmp/exons_{region}_{fraction}p.bed"),
+		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{region}_{fraction}p.bed"
+	shell:"""
+	bedtools intersect -a {input.regions} -b {input.coverage_accepted} > {output.tmp_cov} #make this temp
+	bedtools intersect -v -a {output.tmp_cov} -b {input.blacklist} > {output.tmp_blacklist}
+	bedtools intersect -v -a {output.tmp_blacklist} -b {input.exons} > {output.tmp_exons}¨
+	tmp=`bedtools intersect -wo -a {input.regions} -b {output.tmp_exons}| awk '{{s+=$7}} END {{print s}}'`
+	num=$(expr {window_sizes} \* 10000 / 2)
+	if [[ $tmp -ge $num ]]
+	then 
+		cp {output.tmp_exons} {output.filtered_regions}
+	else
+		touch {output.filtered_regions}
+	fi
 	"""
