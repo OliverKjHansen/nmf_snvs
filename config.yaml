@@ -2,10 +2,10 @@
 datasets: ["topmed"]
 
 # these are fixed files
-#genome_bed: "files/hg38_clean.bed"
-#blacklist: "files/hg38-blacklist.v2.bed"
-#twobitgenome: "files/hg38.2bit"
-#exome_pos:
+genome_bed: "files/hg38_clean.bed"
+blacklist: "files/hg38-blacklist.v2.bed"
+twobitgenome: "files/hg38.2bit"
+exon: files/exons.bed
 #topmed_data: "raw_vcf/"
 #coverage: "coverage/"
 

@@ -8,9 +8,10 @@ configfile: 'config.yaml'
 chrom = config["chromosomes"]
 length = config["chromosome_length"]
 datasets = config["datasets"]
-#genome_bed = config["genome_bed"]
-#blacklist = config["blacklist"]
-# two_bit = config["twobitgenome"]
+genome_bed = config["genome_bed"]
+blacklist = config["blacklist"]
+two_bit = config["twobitgenome"]
+exons = config["exon"]
 window_sizes = config["window_size_kb"]
 NumberWithDepth = config["NumberWithDepth"]
 allelefrequency = config["allelefrequency"]
@@ -142,8 +143,8 @@ rule filtering_regions:
 	conda: "envs/bedtools.yaml"
 	resources:
 		threads=1,
-		time=60,
-		mem_mb=1000
+		time=120,
+		mem_mb=5000
 	output:
 		tmp_cov = temporary("{window_sizes}kb_windows/tmp/tmp_coverage_{region}_{fraction}p.bed"),
 		tmp_blacklist = temporary("{window_sizes}kb_windows/tmp/blacklist_{region}_{fraction}p.bed"),
@@ -152,7 +153,7 @@ rule filtering_regions:
 	shell:"""
 	bedtools intersect -a {input.regions} -b {input.coverage_accepted} > {output.tmp_cov} #make this temp
 	bedtools intersect -v -a {output.tmp_cov} -b {input.blacklist} > {output.tmp_blacklist}
-	bedtools intersect -v -a {output.tmp_blacklist} -b {input.exons} > {output.tmp_exons}¨
+	bedtools intersect -v -a {output.tmp_blacklist} -b {input.exons} > {output.tmp_exons}
 	tmp=`bedtools intersect -wo -a {input.regions} -b {output.tmp_exons}| awk '{{s+=$7}} END {{print s}}'`
 	num=$(expr {window_sizes} \* 10000 / 2)
 	if [[ $tmp -ge $num ]]
