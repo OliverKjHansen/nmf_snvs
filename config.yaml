@@ -36,7 +36,7 @@ chromosome_length: {chr1: 248956422, chr2: 242193529,
 
 window_size_kb: [10]
 
-#kmer_indels: [4,6] #,6, 8, 10, 2]
+kmer_snvs: [3] #,6, 8, 10, 2]
 
 NumberWithDepth: [90]
 
