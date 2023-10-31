@@ -68,7 +68,7 @@ rule all:
 		"files/{datasets}/derived_files/accepted_coverage/all_coverage_x10_{fraction}p.bed",
 		"files/{datasets}/vcf_files/{chrom}.BRAVO_TOPMed_Freeze_8.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
-		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz"
+		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
 		"{window_sizes}kb_windows/regions/{region}.bed",
 		"{window_sizes}kb_windows/filtered_regions/{region}_{fraction}p.bed",
 		"{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed",
