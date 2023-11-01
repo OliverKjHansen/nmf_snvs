@@ -8,7 +8,7 @@ import pandas as pd
 #this is the header of the topmed coverage file
 #CHROM, BP, MEAN, MEDIAN, PCT_INDV_OVER_1X, PCT_INDV_OVER_5X, PCT_INDV_OVER_10X, PCT_INDV_OVER_15X,PCT_INDV_OVER_20X, PCT_INDV_OVER_25X, PCT_INDV_OVER_30X, PCT_INDV_OVER_50X, PCT_INDV_OVER_100X
 
-# im indexing into 7 beacuse thats the pct over 20x
+# im indexing into 8 beacuse thats the pct over 20x
 
 def making_bed(file, percent_of_individual):
     with open(file, "r") as f:
@@ -71,5 +71,5 @@ if __name__ == '__main__':
     chr_cov = sys.argv[1]
     percent_of_individual = sys.argv[2]
     making_bed(chr_cov, percent_of_individual)
-    counting_breakpoints(chr_cov, percent_of_individual)
+    #counting_breakpoints(chr_cov, percent_of_individual)
 
