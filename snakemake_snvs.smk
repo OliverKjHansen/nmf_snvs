@@ -38,7 +38,7 @@ def making_windows(chromosomes, length, window_sizes):
                 for pos in range((split-chr_split_length), split, size):
                     title = chrom+"_"+str(int((pos) / 1000)) + "kb_to_" + str(int((pos+size)/ 1000)) + "kb"
                     regions.append(title)
-                chromo[chrom][f"{chrom}_{split-chr_split_length}_{split}kb"] = regions
+                chromo[chrom][f"{chrom}_{int((split-chr_split_length)/1000)}kb_{int(split/1000)}kb"] = regions
     return chromo
 
 #regions_and_splits = making_windows(chrom, length, window_sizes)
@@ -94,7 +94,7 @@ rule all:
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
 		"{window_sizes}kb_windows/regions/{splits_list}/",
-		"{window_sizes}kb_windows/filtered_regions/{splits_list}/*_{fraction}p.bed"
+		"{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed"
 		# "{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed",
 		# "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed",
 		# "{window_sizes}kb_windows/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/snv_counts_{region}_{kmer}mer.bed",
@@ -164,6 +164,7 @@ rule filtering_regions:
  		blacklist = blacklist,
 		exons = exons
 	conda: "envs/bedtools.yaml"
+	params: 
 	resources:
 		threads=2,
 		time=120,
@@ -172,7 +173,7 @@ rule filtering_regions:
 		# tmp_cov = temporary("{window_sizes}kb_windows/tmp/tmp_coverage_{region}_{fraction}p.bed"),
 		# tmp_blacklist = temporary("{window_sizes}kb_windows/tmp/blacklist_{region}_{fraction}p.bed"),
 		# tmp_exons = temporary("{window_sizes}kb_windows/tmp/exons_{region}_{fraction}p.bed"),
-		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{splits_list}/*_{fraction}p.bed"
+		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed"
 	shell:"""
 
 	folder={input.regions}
@@ -208,6 +209,7 @@ rule filtering_regions:
 			rm -f "$tmp_cov" "$tmp_blacklist" "$tmp_exon"
 		fi
 	done
+	touch {output.filtered_regions}
 	"""
 
 # rule background_counter: #im not sure this works
