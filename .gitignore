@@ -7,8 +7,9 @@ files/
 logs/
 .snakemake/
 10kb_windows/
-regions.pkl
-
+regions_and_splits.pkl
+test_folder/*
+splits_list.pkl
 # User-specific files
 *.rsuser
 *.suo
