@@ -94,7 +94,10 @@ rule all:
 		"files/{datasets}/derived_files/vcf_snvs/{chrom}_indel_{freq}.vcf.gz",
 		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
 		"{window_sizes}kb_windows/regions/{splits_list}/",
-		"{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed"
+		"{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
+		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}/dummyfile_background.bed",
+		#"{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed",
+		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.bed"
 		# "{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed",
 		# "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed",
 		# "{window_sizes}kb_windows/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/snv_counts_{region}_{kmer}mer.bed",
@@ -168,7 +171,7 @@ rule filtering_regions:
 	resources:
 		threads=2,
 		time=120,
-		mem_mb=5000
+		mem_mb=2500
 	output:
 		# tmp_cov = temporary("{window_sizes}kb_windows/tmp/tmp_coverage_{region}_{fraction}p.bed"),
 		# tmp_blacklist = temporary("{window_sizes}kb_windows/tmp/blacklist_{region}_{fraction}p.bed"),
@@ -198,7 +201,7 @@ rule filtering_regions:
 			num=$(expr {window_sizes} \* 1000 / 2)
 
 			output_file="$output_dir/$file_name"
-
+			echo "$output_file"
 
 			if [[ $tmp -ge $num ]]
 			then 
@@ -212,66 +215,124 @@ rule filtering_regions:
 	touch {output.filtered_regions}
 	"""
 
-# rule background_counter: #im not sure this works
-# 	input:
-# 		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{region}_{fraction}p.bed",
-# 		genome = two_bit
-# 	conda: "envs/kmer_counter.yaml"
-# 	params:
-# 		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0]),
-# 	output:
+rule background_counter: #im not sure this works tmp_bck=$(mktemp)
+	input:
+		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
+		genome = two_bit
+	conda: "envs/kmer_counter.yaml"
+	params:
+		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
+	resources:
+		threads=4,
+		time=240,
+		mem_mb=5000
+	output:
 # 		background = temporary("{window_sizes}kb_windows/tmp/background_{region}_{kmer}mer_{fraction}p.bed"),
-# 		ss_background = "{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed"
-# 	shell:"""
-# 	check=`cat {input.filtered_regions} | wc -l`
-# 	if [[ $check -gt 0 ]]
-# 	then 
-# 		kmer_counter background --bed {input.filtered_regions} --radius {params.radius} {input.genome} > {output.background}
-# 		awk -v OFS='\t' '{{print "{wildcards.region}",$1,$2}}' {output.background} > {output.ss_background}
-# 	else
-# 		touch {output.background}
-# 		touch {output.ss_background}
-# 	fi
-# 	"""
+		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}/dummyfile_background.bed" 
+	shell:"""
+	folder=$(dirname {input.filtered_regions})
+	output_snakemake={output.ss_background}
+	output_dir=$(dirname "$output_snakemake")
+
+	for file in "$folder"/*
+	do
+		if [ -f "$file" ]
+		then
+			file_name=$(basename "$file")
+			output_file="$output_dir/$file_name"
+			tmp_bck=$(mktemp)
+			check=`cat "$file" | wc -l`
+			if [[ "$check" -gt 0 ]]
+			then 
+				kmer_counter background --bed {input.filtered_regions} --radius {params.radius} {input.genome} > "$tmp_bck"
+				awk -v OFS='\t' '{{print "$file_name",$1,$2}}' "$tmp_bck" > "$output_file"
+			else
+				touch "$output_file"
+			fi
+			rm -f "$tmp_bck"
+		fi
+	done
+	touch {output.ss_background}
+	"""
 
 # rule creating_variants:
 # 	input:
-# 		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{region}_{fraction}p.bed",
+# 		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
 # 		vcf_file = expand("files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz", datasets=datasets, freq = allelefrequency)
 # 	conda: "envs/bedtools.yaml"
+# 	resources:
+# 		threads=4,
+# 		time=420,
+# 		mem_mb=5000
 # 	output:
-# 		variants =  "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed"
+# 		variants =  "{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed"
 # 	shell:"""
-# 	check=`cat {input.filtered_regions} | wc -l`
-# 	if [[ $check -gt 0 ]]
-# 	then
-# 		bedtools intersect -a {input.vcf_file} -b {input.filtered_regions} | awk -v OFS='\t' '{{print $1,$2,$4,$5}}' > {output.variants}
-# 	else
-# 		touch {output.variants}
-# 	fi
+# 	folder=$(dirname {input.filtered_regions})
+# 	output_snakemake={output.variants}
+# 	output_dir=$(dirname "$output_snakemake")
+
+# 	for file in "$folder"/*
+# 	do
+# 		if [ -f "$file" ]
+# 		then
+# 			file_name=$(basename "$file")
+# 			output_file="$output_dir/$file_name"
+# 			check=`cat "$file" | wc -l`
+# 			if [[ "$check" -gt 0 ]]
+# 			then 
+# 				bedtools intersect -a {input.vcf_file} -b "$file" | awk -v OFS='\t' '{{print $1,$2,$4,$5}}' > "$output_file"
+# 			else
+# 				touch "$output_file"
+# 			fi
+# 		fi
+# 	done
+# 	touch {output.variants}
 # 	"""
 
-# rule snv_variant_counter:
-# 	input:
-# 		variants = "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed",
-# 		genome = two_bit
-# 	conda: "envs/kmer_counter.yaml"
-# 	params:
-# 		radius  = lambda wildcards: int(int(wildcards.kmer)/2)
-# 	output:
-# 		kmer_count_snv = temporary("{window_sizes}kb_windows/tmp/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/counts_{region}_{kmer}mer.bed"),
-# 		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/snv_counts_{region}_{kmer}mer.bed",
-# 	shell:"""
-# 	check=`cat {input.variants} | wc -l`
-# 	if [[ $check -gt 0 ]]
-# 	then
-# 		kmer_counter snv {input.genome} {input.variants} > {output.kmer_count_snv}
-# 		awk -v OFS='\t' '{{print "{wildcards.region}",$1,$2}}' {output.kmer_count_snv} > {output.ss_snv} 
-# 	else
-# 		touch {output.kmer_count_snv}
-# 		touch {output.ss_snv} 
-# 	fi
-# 	"""
+rule snv_variant_counter:
+	input:
+		filtered_regions = "{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
+		#variants = "{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed",
+		vcf_file = expand("files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz", datasets=datasets, freq = allelefrequency),
+		genome = two_bit
+	conda: "envs/kmer_counter.yaml"
+	resources:
+		threads=4,
+		time=240,
+		mem_mb=5000
+	params:
+		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
+	output:
+		#kmer_count_snv = temporary("{window_sizes}kb_windows/tmp/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/counts_{region}_{kmer}mer.bed"),
+		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.bed"
+	shell:"""
+	folder=$(dirname {input.filtered_regions})
+	output_snakemake={output.ss_snv}
+	output_dir=$(dirname "$output_snakemake")
+
+	for file in "$folder"/*
+	do
+		if [ -f "$file" ]
+		then
+			file_name=$(basename "$file")
+			output_file="$output_dir/$file_name"
+			tmp_variants=$(mktemp)
+			tmp_bck=$(mktemp)
+			check=`cat "$file" | wc -l`
+			if [[ "$check" -gt 0 ]]
+			then 
+				bedtools intersect -a {input.vcf_file} -b "$file" | awk -v OFS='\t' '{{print $1,$2,$4,$5}}' > "$tmp_variants"
+				echo "tmp_variants"
+				kmer_counter snv {input.genome} "$tmp_variants" > "$tmp_bck"
+				awk -v OFS='\t' '{{print "$file_name",$1,$2}}' "$tmp_bck" > "$output_file"
+			else
+				touch "$output_file"
+			fi
+			rm -f "$tmp_bck"
+		fi
+	done
+	touch {output.ss_snv}
+	"""
 # ##Make a check for the directories
 # rule aggregate_regions:
 # 	input:

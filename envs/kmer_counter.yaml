@@ -4,6 +4,7 @@ channels:
   - conda-forge
 dependencies: 
   - python=3.12
+  - bedtools=2.31.0
   - pip
   - pip:
     - kmer_counter
