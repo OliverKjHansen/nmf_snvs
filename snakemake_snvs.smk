@@ -170,7 +170,7 @@ rule filtering_regions:
 	params: 
 	resources:
 		threads=2,
-		time=120,
+		time=180,
 		mem_mb=2500
 	output:
 		# tmp_cov = temporary("{window_sizes}kb_windows/tmp/tmp_coverage_{region}_{fraction}p.bed"),
@@ -223,9 +223,9 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 	params:
 		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
 	resources:
-		threads=4,
+		threads=2,
 		time=240,
-		mem_mb=5000
+		mem_mb=3000
 	output:
 # 		background = temporary("{window_sizes}kb_windows/tmp/background_{region}_{kmer}mer_{fraction}p.bed"),
 		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}/dummyfile_background.bed" 
@@ -244,8 +244,8 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 			check=`cat "$file" | wc -l`
 			if [[ "$check" -gt 0 ]]
 			then 
-				kmer_counter background --bed {input.filtered_regions} --radius {params.radius} {input.genome} > "$tmp_bck"
-				awk -v OFS='\t' '{{print "$file_name",$1,$2}}' "$tmp_bck" > "$output_file"
+				kmer_counter background --bed "$file" --radius {params.radius} {input.genome} > "$tmp_bck"
+				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name,$1,$2}}' "$tmp_bck" > "$output_file"
 			else
 				touch "$output_file"
 			fi
@@ -298,7 +298,7 @@ rule snv_variant_counter:
 	conda: "envs/kmer_counter.yaml"
 	resources:
 		threads=4,
-		time=240,
+		time=420,
 		mem_mb=5000
 	params:
 		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
@@ -317,14 +317,14 @@ rule snv_variant_counter:
 			file_name=$(basename "$file")
 			output_file="$output_dir/$file_name"
 			tmp_variants=$(mktemp)
-			tmp_bck=$(mktemp)
+			tmp_snv=$(mktemp)
 			check=`cat "$file" | wc -l`
 			if [[ "$check" -gt 0 ]]
 			then 
-				bedtools intersect -a {input.vcf_file} -b "$file" | awk -v OFS='\t' '{{print $1,$2,$4,$5}}' > "$tmp_variants"
-				echo "tmp_variants"
-				kmer_counter snv {input.genome} "$tmp_variants" > "$tmp_bck"
-				awk -v OFS='\t' '{{print "$file_name",$1,$2}}' "$tmp_bck" > "$output_file"
+				bedtools intersect -a {input.vcf_file} -b "$file" | \
+				awk -v OFS='\t' '{{print $1, $2, $4, $5}}' | \
+				kmer_counter snv {input.genome} - | \
+				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2}}' > "$output_file"
 			else
 				touch "$output_file"
 			fi
