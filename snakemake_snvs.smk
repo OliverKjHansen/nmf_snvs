@@ -180,9 +180,8 @@ rule filtering_regions:
 	shell:"""
 
 	folder={input.regions}
-
-	output_snakemake={output.filtered_regions}
-	output_dir=$(dirname "$output_snakemake")
+	output_dir=$(dirname {output.filtered_regions})
+	echo $output_dir
 
 	for file in "$folder"/*
 	do
@@ -190,30 +189,37 @@ rule filtering_regions:
 		then
 			file_name=$(basename "$file")
 
-			tmp_cov=$(mktemp)      
-			tmp_blacklist=$(mktemp) 
-  			tmp_exon=$(mktemp)      
+			tmp_filter=$(mktemp)
 
-			bedtools intersect -a "$file" -b {input.coverage_accepted} > "$tmp_cov"
-			bedtools intersect -v -a "$tmp_cov" -b {input.blacklist} > "$tmp_blacklist"
-			bedtools intersect -v -a "$tmp_blacklist" -b {input.exons} > "$tmp_exon"
-			tmp=`bedtools intersect -wo -a "$file" -b "$tmp_exon"| awk '{{s+=$7}} END {{print s}}'`
+			bedtools intersect -a "$file" -b {input.coverage_accepted} | \
+    		bedtools intersect -v -a - -b {input.blacklist} | \
+    		bedtools intersect -v -a - -b {input.exons} > "$tmp_filter"
+
+			tmp=`bedtools intersect -wo -a "$file" -b "$tmp_filter" | awk '{{s+=$7}} END {{print s}}'`
+			echo "$tmp"
+
 			num=$(expr {window_sizes} \* 1000 / 2)
+			echo "$num"
 
 			output_file="$output_dir/$file_name"
 			echo "$output_file"
 
 			if [[ $tmp -ge $num ]]
 			then 
-				cp "$tmp_exon" "$output_file"
+				cp "$tmp_filer" "$output_file"
 			else
 				touch "$output_file"
 			fi
-			rm -f "$tmp_cov" "$tmp_blacklist" "$tmp_exon"
+			rm -f "$tmp_filter""
 		fi
 	done
 	touch {output.filtered_regions}
 	"""
+
+# bedtools intersect -a "$file" -b {input.coverage_accepted} > "$tmp_cov"
+# bedtools intersect -v -a "$tmp_cov" -b {input.blacklist} > "$tmp_blacklist"
+# bedtools intersect -v -a "$tmp_blacklist" -b {input.exons} > "$tmp_exon"
+# tmp=`bedtools intersect -wo -a "$file" -b "$tmp_exon"| awk '{{s+=$7}} END {{print s}}'`
 
 rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 	input:
@@ -228,31 +234,27 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 		mem_mb=3000
 	output:
 # 		background = temporary("{window_sizes}kb_windows/tmp/background_{region}_{kmer}mer_{fraction}p.bed"),
-		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}/dummyfile_background.bed" 
+		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}.tsv",
+		background_dummy "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt",
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
-	output_snakemake={output.ss_background}
-	output_dir=$(dirname "$output_snakemake")
+	mkdir -p $(dirname {ss_background})
+	touch {ss_background}
 
 	for file in "$folder"/*
 	do
 		if [ -f "$file" ]
 		then
 			file_name=$(basename "$file")
-			output_file="$output_dir/$file_name"
-			tmp_bck=$(mktemp)
 			check=`cat "$file" | wc -l`
 			if [[ "$check" -gt 0 ]]
 			then 
-				kmer_counter background --bed "$file" --radius {params.radius} {input.genome} > "$tmp_bck"
-				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name,$1,$2}}' "$tmp_bck" > "$output_file"
-			else
-				touch "$output_file"
+				kmer_counter background --bed "$file" --radius {params.radius} {input.genome} | \
+				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name,$1,$2}}' - >> {ss_background}
 			fi
-			rm -f "$tmp_bck"
 		fi
 	done
-	touch {output.ss_background}
+	touch {output.background_dummy}
 	"""
 
 # rule creating_variants:
@@ -304,31 +306,26 @@ rule snv_variant_counter:
 		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
 	output:
 		#kmer_count_snv = temporary("{window_sizes}kb_windows/tmp/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/counts_{region}_{kmer}mer.bed"),
-		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.bed"
+		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv"
+		dummy_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
-	output_snakemake={output.ss_snv}
-	output_dir=$(dirname "$output_snakemake")
+	mkdir -p $(dirname {output.ss_snv})
+	touch {output.ss_snv}
 
 	for file in "$folder"/*
 	do
 		if [ -f "$file" ]
 		then
 			file_name=$(basename "$file")
-			output_file="$output_dir/$file_name"
-			tmp_variants=$(mktemp)
-			tmp_snv=$(mktemp)
 			check=`cat "$file" | wc -l`
 			if [[ "$check" -gt 0 ]]
 			then 
 				bedtools intersect -a {input.vcf_file} -b "$file" | \
 				awk -v OFS='\t' '{{print $1, $2, $4, $5}}' | \
 				kmer_counter snv {input.genome} - | \
-				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2}}' > "$output_file"
-			else
-				touch "$output_file"
+				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2}}' >> {output.ss_snv}
 			fi
-			rm -f "$tmp_bck"
 		fi
 	done
 	touch {output.ss_snv}
