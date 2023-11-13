@@ -96,7 +96,7 @@ rule all:
 		"{window_sizes}kb_windows/regions/{splits_list}/",
 		"{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
 		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}.tsv",
-		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt",
+		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_files/{splits_list}.txt",
 		#"{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed",
 		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv",
 		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
@@ -237,7 +237,7 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 	output:
 # 		background = temporary("{window_sizes}kb_windows/tmp/background_{region}_{kmer}mer_{fraction}p.bed"),
 		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}.tsv",
-		background_dummy = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt"
+		background_dummy = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_files/{splits_list}.txt" # should proberly change this 
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
 	mkdir -p $(dirname {output.ss_background})
