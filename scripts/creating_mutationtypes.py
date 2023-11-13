@@ -11,14 +11,24 @@ import sys
 # while True:
 #     print("waiting")
 
-def splitting_to_insertions(file):
+base_table = {"A":"T", 
+              "T":"A", 
+              "G":"C", 
+              "C":"G"}
+  
+def splitting_to_mutationstypes(file, ref, alt):
     with open(file, "r") as f:
         for line in f:
-            variant_indel = line.split("\n")[0].split("\t")
-            if len(variant_indel[2]) < len(variant_indel[3]):
+            #print(line)
+            vcf_ref = line.split("\n")[0].split("\t")[2]
+            vcf_alt = line.split("\n")[0].split("\t")[3]
+            if vcf_ref.upper() == ref and vcf_alt.upper() == alt:
+                print(line.split("\n")[0]) 
+            if base_table[vcf_ref].upper() == ref and base_table[vcf_alt].upper() == alt:
                 print(line.split("\n")[0])
 
-# #def counting_indels(variant_file):
+
+# def counting_indels(variant_file):
 #     insertion = 0
 #     deletion = 0
 #     with open(variant_file, "r") as f:
@@ -35,6 +45,8 @@ def splitting_to_insertions(file):
 
 if __name__ == '__main__':
     variants = sys.argv[1]
-    splitting_to_insertions(variants)
+    ref_mut = sys.argv[2]
+    alt_mut = sys.argv[3]
+    splitting_to_mutationstypes(variants,ref_mut.upper(),alt_mut.upper())
 
 

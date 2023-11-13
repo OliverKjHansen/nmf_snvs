@@ -95,9 +95,11 @@ rule all:
 		"files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz",
 		"{window_sizes}kb_windows/regions/{splits_list}/",
 		"{window_sizes}kb_windows/filtered_regions/{splits_list}/dummyfile_{fraction}p.bed",
-		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}/dummyfile_background.bed",
+		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}.tsv",
+		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt",
 		#"{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed",
-		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.bed"
+		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv",
+		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
 		# "{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed",
 		# "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed",
 		# "{window_sizes}kb_windows/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/snv_counts_{region}_{kmer}mer.bed",
@@ -195,7 +197,7 @@ rule filtering_regions:
     		bedtools intersect -v -a - -b {input.blacklist} | \
     		bedtools intersect -v -a - -b {input.exons} > "$tmp_filter"
 
-			tmp=`bedtools intersect -wo -a "$file" -b "$tmp_filter" | awk '{{s+=$7}} END {{print s}}'`
+			tmp=`bedtools intersect -wo -a "$file" -b "$tmp_filter" | awk '{{s+=$7}} END {{print s}}' `
 			echo "$tmp"
 
 			num=$(expr {window_sizes} \* 1000 / 2)
@@ -206,11 +208,11 @@ rule filtering_regions:
 
 			if [[ $tmp -ge $num ]]
 			then 
-				cp "$tmp_filer" "$output_file"
+				cp "$tmp_filter" "$output_file"
 			else
 				touch "$output_file"
 			fi
-			rm -f "$tmp_filter""
+			rm -f "$tmp_filter"
 		fi
 	done
 	touch {output.filtered_regions}
@@ -235,11 +237,11 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 	output:
 # 		background = temporary("{window_sizes}kb_windows/tmp/background_{region}_{kmer}mer_{fraction}p.bed"),
 		ss_background = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/{splits_list}.tsv",
-		background_dummy "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt",
+		background_dummy = "{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_{splits_list}.txt"
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
-	mkdir -p $(dirname {ss_background})
-	touch {ss_background}
+	mkdir -p $(dirname {output.ss_background})
+	touch {output.ss_background}
 
 	for file in "$folder"/*
 	do
@@ -249,8 +251,8 @@ rule background_counter: #im not sure this works tmp_bck=$(mktemp)
 			check=`cat "$file" | wc -l`
 			if [[ "$check" -gt 0 ]]
 			then 
-				kmer_counter background --bed "$file" --radius {params.radius} {input.genome} | \
-				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name,$1,$2}}' - >> {ss_background}
+				kmer_counter background --bed "$file" --radius {params.radius} --reverse_complement_method middle {input.genome} | \
+				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name,$1,$2}}' - >> {output.ss_background}
 			fi
 		fi
 	done
@@ -298,6 +300,8 @@ rule snv_variant_counter:
 		vcf_file = expand("files/{datasets}/derived_files/vcf_snvs/all_snvs_{freq}.vcf.gz", datasets=datasets, freq = allelefrequency),
 		genome = two_bit
 	conda: "envs/kmer_counter.yaml"
+	params:
+		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
 	resources:
 		threads=4,
 		time=420,
@@ -306,12 +310,14 @@ rule snv_variant_counter:
 		radius  = lambda wildcards: int(creating_radius(wildcards.kmer)[0])
 	output:
 		#kmer_count_snv = temporary("{window_sizes}kb_windows/tmp/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/counts_{region}_{kmer}mer.bed"),
-		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv"
+		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv",
 		dummy_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
 	mkdir -p $(dirname {output.ss_snv})
 	touch {output.ss_snv}
+
+	vcf_tmp=$(mktemp)
 
 	for file in "$folder"/*
 	do
@@ -322,13 +328,17 @@ rule snv_variant_counter:
 			if [[ "$check" -gt 0 ]]
 			then 
 				bedtools intersect -a {input.vcf_file} -b "$file" | \
-				awk -v OFS='\t' '{{print $1, $2, $4, $5}}' | \
-				kmer_counter snv {input.genome} - | \
-				awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2}}' >> {output.ss_snv}
+				awk -v OFS='\t' '{{print $1, $2, $4, $5}}'  > "$vcf_tmp"
+				python scripts/creating_mutationtypes.py "$vcf_tmp" A C | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "A", "C"}}' >> {output.ss_snv}
+				python scripts/creating_mutationtypes.py "$vcf_tmp" A G | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "A", "G"}}' >> {output.ss_snv}
+				python scripts/creating_mutationtypes.py "$vcf_tmp" A T | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "A", "T"}}' >> {output.ss_snv}
+				python scripts/creating_mutationtypes.py "$vcf_tmp" G C | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "G", "C"}}' >> {output.ss_snv}
+				python scripts/creating_mutationtypes.py "$vcf_tmp" G A | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "G", "A"}}' >> {output.ss_snv}
+				python scripts/creating_mutationtypes.py "$vcf_tmp" G T | kmer_counter snv --radius {params.radius} {input.genome} - | awk -v OFS='\t' -v file_name="$file_name" '{{print file_name, $1, $2, "G", "T"}}' >> {output.ss_snv}
 			fi
 		fi
 	done
-	touch {output.ss_snv}
+	touch {output.dummy_snv}
 	"""
 # ##Make a check for the directories
 # rule aggregate_regions:
