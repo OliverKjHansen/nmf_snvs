@@ -99,7 +99,7 @@ rule all:
 		"{window_sizes}kb_windows/background_{kmer}mer_{fraction}p/dummy_files/{splits_list}.txt",
 		#"{window_sizes}kb_windows/variants_{freq}_{fraction}p/{splits_list}/dummy_snv.bed",
 		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv",
-		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
+		"{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/dummy_files/{splits_list}.txt"
 		# "{window_sizes}kb_windows/background_{kmer}mer/background_{region}_{kmer}mer_{fraction}p.bed",
 		# "{window_sizes}kb_windows/variants/snv_{region}_{freq}_{fraction}p.bed",
 		# "{window_sizes}kb_windows/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/snv_counts_{region}_{kmer}mer.bed",
@@ -311,7 +311,7 @@ rule snv_variant_counter:
 	output:
 		#kmer_count_snv = temporary("{window_sizes}kb_windows/tmp/snv_{kmer}mer/frequency_{freq}_at_{fraction}p/counts_{region}_{kmer}mer.bed"),
 		ss_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}.tsv",
-		dummy_snv = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/{splits_list}/dummy_{kmer}mer.txt"
+		snv_dummy = "{window_sizes}kb_windows/snv_{kmer}mer_freq_{freq}_at_{fraction}p/dummy_files/{splits_list}.txt"
 	shell:"""
 	folder=$(dirname {input.filtered_regions})
 	mkdir -p $(dirname {output.ss_snv})
@@ -338,7 +338,7 @@ rule snv_variant_counter:
 			fi
 		fi
 	done
-	touch {output.dummy_snv}
+	touch {output.snv_dummy}
 	"""
 # ##Make a check for the directories
 # rule aggregate_regions:
